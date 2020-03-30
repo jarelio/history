@@ -70,7 +70,7 @@ class AuthMiddleware(object):
 class HistoryUtil(object):
 
     db = pymongo.MongoClient(conf.db_host, replicaSet=conf.db_replica_set)
-
+    
     @staticmethod
     def get_db():
         return HistoryUtil.db['device_history']
@@ -123,8 +123,19 @@ class DeviceHistory(object):
         else:
             limit_val = False
 
-        if attr:
+        if 'near' in request.params.keys() and attr:
+            pm_value = request.params['near']
+            query = {'attr': attr, 'value':{ '$near': {
+                    '$geometry': {
+                        'type': "Point" ,
+                        'coordinates':  [float(pm_value[0]),float( pm_value[1])]
+                    },
+                    '$maxDistance': int(pm_value[2]) if len(pm_value) >= 3 else 1000,
+                    '$minDistance': int(pm_value[3]) if len(pm_value) == 4 else 0
+                    }}}
+        elif attr:
             query = {'attr': attr, 'value': {'$ne': ' '}}
+
         ts_filter = {}
         if 'dateFrom' in request.params.keys():
             ts_filter['$gte'] = dateutil.parser.parse(request.params['dateFrom'])
@@ -155,6 +166,11 @@ class DeviceHistory(object):
 
     @staticmethod
     def get_single_attr(collection, query):
+        #TODO: Melhora 
+        try:
+            collection.create_index([("value","2dsphere")])
+        except:
+            pass
         cursor = collection.find(query['query'],
                                  query['filter'],
                                  sort=query['sort'],
@@ -168,7 +184,6 @@ class DeviceHistory(object):
     @staticmethod
     def on_get(req, resp, device_id):
         collection = HistoryUtil.get_collection(req.context['related_service'], device_id)
-
         if 'attr' in req.params.keys():
             if isinstance(req.params['attr'], list):
                 logger.info('got list of attrs')
