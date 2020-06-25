@@ -195,6 +195,45 @@ class DeviceHistory(object):
         resp.status = falcon.HTTP_200
         resp.body = json.dumps(history)
 
+    @staticmethod
+    def parse_request_remove(request):
+        """ returns mongo compatible query object, based on the query params provided """
+
+        query = {}
+        ts_filter = {}
+        if 'dateFrom' in request.params.keys():
+            ts_filter['$gte'] = dateutil.parser.parse(request.params['dateFrom'])
+        if 'dateTo' in request.params.keys():
+            ts_filter['$lte'] = dateutil.parser.parse(request.params['dateTo'])
+        if len(ts_filter.keys()) > 0:
+            query['ts'] = ts_filter
+
+        return query
+
+    @staticmethod
+    def on_delete(req, resp, device_id):
+        collection = HistoryUtil.get_collection(req.context['related_service'], device_id)
+
+        try:
+            query = DeviceHistory.parse_request_remove(req)
+        except:
+            msg = "Request params are in an invalid format"
+            raise falcon.HTTPBadRequest(title="Bad request", description=msg)
+
+        history_remove = collection.delete_many(query)
+
+        if history_remove.deleted_count == 0:
+            msg = "No data with this params could be found"
+            raise falcon.HTTPNotFound(title="Data not found", description=msg)
+
+        result = {}
+        result["ack"] = history_remove.acknowledged
+        result["deletedCount"] = history_remove.deleted_count
+        result["raw"] = history_remove.raw_result
+
+        resp.status = falcon.HTTP_200
+        resp.body = json.dumps(result)
+
 class NotificationHistory(object):
 
     @staticmethod
