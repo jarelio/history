@@ -2,6 +2,7 @@
 """
 Exposes device information using dojot's modelling
 """
+import csv
 import json
 import base64
 import re
@@ -104,6 +105,73 @@ class HistoryUtil(object):
                     ret = ret + l
             return ret
 
+class DeviceExportHistory(object):
+    
+    @staticmethod
+    def on_get(req, resp, device_id):
+        collection = HistoryUtil.get_collection(req.context['related_service'], device_id)
+
+        if 'attr' in req.params.keys():
+            if isinstance(req.params['attr'], list):
+                logger.info('got list of attrs')
+                history = {}
+                for attr in req.params['attr']:
+                    query = DeviceHistory.parse_request(req, attr)
+                    history[attr] = DeviceHistory.get_single_attr(collection, query)
+            else:
+                history = DeviceHistory.get_single_attr(
+                collection, DeviceHistory.parse_request(req, req.params['attr']))
+                if len(history) == 0:
+                    msg = "No data for the given attribute could be found"
+                    raise falcon.HTTPNotFound(title="Attr not found", description=msg)
+        else:
+            logger.info('will return all the attrs')
+            history = {}
+            token = req.get_header('authorization')
+            attrs_list = DeviceHistory.get_attrs(device_id,token)
+            for attr in attrs_list:
+                query = DeviceHistory.parse_request(req,attr)
+                history[attr] = DeviceHistory.get_single_attr(collection,query)
+
+        if 'type' in req.params.keys():
+    
+            if req.params['type'] == 'json':
+                DeviceExportHistory.generate_json(req.context['related_service'], device_id, history)
+            elif req.params['type'] == 'csv':
+                DeviceExportHistory.generate_csv(req.context['related_service'], device_id, history)
+            elif req.params['type'] == 'both':
+                DeviceExportHistory.generate_json(req.context['related_service'], device_id, history)
+                DeviceExportHistory.generate_csv(req.context['related_service'], device_id, history)
+            else:
+                msg = "Invalid type of file to export"
+                raise falcon.HTTPNotFound(title="Invalid Type", description=msg)
+        else:
+            DeviceExportHistory.generate_json(req.context['related_service'], device_id, history)
+    
+        response = {"title": "Data exported", "description": "Device data exported"}
+        resp.status = falcon.HTTP_200
+        resp.body = json.dumps(response)
+    
+    @staticmethod
+    def generate_json(service, device_id, history):
+        file_path = "%s%s_%s" % (conf.export_file_path, service, device_id)
+        with open(file_path+".json", 'w') as jsonfile:
+            jsonfile.write(json.dumps(history))
+            jsonfile.close()
+    
+    @staticmethod
+    def generate_csv(service, device_id, history):
+        pass
+        #TODO: generate a csv file
+        '''
+        with open(file_path+".csv", 'w', newline='') as csvfile:
+            fieldnames = history.keys()
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerow({'ts': , 'ecg_hr': 90})
+        ''' 
+        
+
 class DeviceHistory(object):
     """Service used to retrieve a given device historical data"""
 
@@ -191,7 +259,6 @@ class DeviceHistory(object):
                 query = DeviceHistory.parse_request(req,attr)
                 history[attr] = DeviceHistory.get_single_attr(collection,query)
 
-
         resp.status = falcon.HTTP_200
         resp.body = json.dumps(history)
 
@@ -226,10 +293,7 @@ class DeviceHistory(object):
             msg = "No data with this params could be found"
             raise falcon.HTTPNotFound(title="Data not found", description=msg)
 
-        result = {}
-        result["ack"] = history_remove.acknowledged
-        result["deletedCount"] = history_remove.deleted_count
-        result["raw"] = history_remove.raw_result
+        result = {"ack": history_remove.acknowledged, "deletedCount": history_remove.deleted_count, "raw": history_remove.raw_result}
 
         resp.status = falcon.HTTP_200
         resp.body = json.dumps(result)

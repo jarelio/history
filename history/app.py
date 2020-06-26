@@ -9,11 +9,12 @@ import falcon
 
 # Local imports
 from history import conf
-from history.api.models import DeviceHistory, STHHistory, AuthMiddleware, NotificationHistory, LoggingInterface
+from history.api.models import DeviceHistory, DeviceExportHistory, STHHistory, AuthMiddleware, NotificationHistory, LoggingInterface
 
 # Create falcon app
 app = falcon.API(middleware=[AuthMiddleware()])
 app.add_route('/device/{device_id}/history', DeviceHistory())
+app.add_route('/device/{device_id}/export', DeviceExportHistory())
 app.add_route('/notifications/history', NotificationHistory())
 app.add_route('/STH/v1/contextEntities/type/{device_type}/id/{device_id}/attributes/{attr}', STHHistory())
 app.add_route('/log',LoggingInterface())

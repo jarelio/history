@@ -49,3 +49,6 @@ data_broker_url = os.environ.get("DATA_BROKER_URL", "http://data-broker")
 auth_url = os.environ.get('AUTH_URL', "http://auth:5000")
 # device-manager URL
 device_manager_url = os.environ.get('DEVICE_MANAGER_URL', "http://device-manager:5000")
+
+#path to export files from api request /export
+export_file_path = os.environ.get('EXPORT_FILE_PATH', './export_dojot/')
