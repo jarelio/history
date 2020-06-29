@@ -109,6 +109,29 @@ class DeviceExportHistory(object):
     
     @staticmethod
     def on_get(req, resp, device_id):
+        if 'type' in req.params.keys():
+            if 'json' in req.params['type']:
+                extension = 'json'
+            elif 'csv' in req.params['type']:
+                extension = 'csv'
+            else:
+                msg = "Invalid type of file to export"
+                raise falcon.HTTPNotFound(title="Invalid Type", description=msg)
+        else:
+            extension = 'json'
+
+        file_name = "%s_%s.%s" % (req.context['related_service'], device_id, extension)
+        file_path = "%s%s" % (conf.export_file_path, file_name)
+        resp.set_header("Content-Disposition", "attachment; filename=\"%s\"" % file_name)
+        try:
+            with open(file_path, 'rb') as f:
+                resp.data = f.read()
+        except:
+            msg = "Invalid device or data not exported"
+            raise falcon.HTTPNotFound(title="Invalid device", description=msg)
+
+    @staticmethod
+    def on_post(req, resp, device_id):
         collection = HistoryUtil.get_collection(req.context['related_service'], device_id)
 
         if 'attr' in req.params.keys():
